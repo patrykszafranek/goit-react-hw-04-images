@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { useState, useEffect } from 'react';
 import css from './App.module.css';
 
 import Searchbar from './Searchbar/Searchbar';
@@ -9,59 +9,50 @@ import Loader from './Loader/Loader';
 
 const PER_PAGE = 12;
 
-class App extends Component {
-  state = {
-    page: 1,
-    photo: [],
-    photoName: '',
-    currentLargeImageURL: '',
-    searchTotal: null,
-    loading: false,
-    error: null,
+function App() {
+  const [page, setPage] = useState(1);
+  const [photo, setPhoto] = useState([]);
+  const [photoName, setPhotoName] = useState('');
+  const [currentLargeImageURL, setCurrentLargeImageURL] = useState('');
+  const [searchTotal, setSearchTotal] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const key = 'key=31934367-658e9fff939a1c4d22479e433';
+
+  const handlerFormSubmit = newPhotoName => {
+    if (photoName === newPhotoName) {
+      return alert('There is the same name');
+    }
+    if (photoName !== newPhotoName) {
+      setPhotoName(newPhotoName);
+      setPage(1);
+      setPhoto([]);
+    }
   };
 
-  handlerFormSubmit = photoName => {
-    if (photoName !== this.state.photoName) {
-      this.setState({ photoName, page: 1 });
-      this.setState({ photo: [] });
+  const handlerLoadMoreClick = () => {
+    setPage(prevState => prevState + 1);
+  };
+
+  const handleOpen = url => {
+    setCurrentLargeImageURL(url);
+  };
+
+  const handleClose = () => {
+    setCurrentLargeImageURL('');
+  };
+
+  useEffect(() => {
+    if (photoName === '') {
       return;
     }
-    if (photoName === this.state.photoName) {
-      alert('There is the same name');
-    } else {
-      alert('There is no photo with this name');
-    }
-  };
-
-  hendlerLoadMoreClick = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
-  };
-
-  handleOpen = url => {
-    this.setState({
-      currentLargeImageURL: url,
-    });
-  };
-
-  handleClose = () => {
-    this.setState({
-      currentLargeImageURL: '',
-    });
-  };
-
-  componentDidUpdate(prevProps, prevState) {
-    const prevName = prevState.photoName;
-    const prevPage = prevState.page;
-    const { photoName, page } = this.state;
-    const key = 'key=33800074-c5ea2d588238b1cebce7975eb';
-
-    if (photoName !== prevName) {
-      this.setState({ photo: [] });
-    }
-    if (prevName !== photoName || prevPage !== page) {
-      this.setState({ loading: true });
-
-      fetch(
+    setLoading(true);
+    const fetchPhotos = () => {
+      if (!photoName) {
+        return;
+      }
+      return fetch(
         `https://pixabay.com/api/?q=${photoName}&page=${page}&${key}&image_type=photo&orientation=horizontal&per_page=${PER_PAGE}`
       )
         .then(res => {
@@ -70,35 +61,36 @@ class App extends Component {
           }
           return Promise.reject(new Error());
         })
-        .then(photo =>
-          this.setState(prevState => ({
-            photo: [...prevState.photo, ...photo.hits],
-            searchTotal: photo.total,
-          }))
-        )
-        .catch(error => this.setState({ error }))
-        .finally(this.setState({ loading: false }));
-    }
-  }
+        .then(photo => {
+          if (!photo.total) {
+            alert('There is no photo with this name');
+          }
+          return photo;
+        })
+        .catch(error => setError(error))
+        .finally(() => setLoading(false));
+    };
 
-  render() {
-    const { page, photo, currentLargeImageURL, searchTotal, loading } =
-      this.state;
-    return (
-      <div className={css.app}>
-        <Searchbar onSubmit={this.handlerFormSubmit} page={page} />
-        {photo && <ImageGallery photoName={photo} onClick={this.handleOpen} />}
+    fetchPhotos().then(photo => {
+      setPhoto(prevPhoto => [...prevPhoto, ...photo.hits]);
+      setSearchTotal(photo.total);
+    });
+  }, [photoName, page, error]);
 
-        {currentLargeImageURL && (
-          <Modal closeModal={this.handleClose} url={currentLargeImageURL} />
-        )}
-        {loading && <Loader />}
-        {!loading && searchTotal > 12 && (
-          <Button onClick={this.hendlerLoadMoreClick} />
-        )}
-      </div>
-    );
-  }
+  return (
+    <div className={css.app}>
+      <Searchbar onSubmit={handlerFormSubmit} page={page} />
+      {photo && <ImageGallery photoName={photo} onClick={handleOpen} />}
+
+      {currentLargeImageURL && (
+        <Modal closeModal={handleClose} url={currentLargeImageURL} />
+      )}
+      {loading && <Loader />}
+      {!loading && searchTotal > 12 && (
+        <Button onClick={handlerLoadMoreClick} />
+      )}
+    </div>
+  );
 }
 
 export default App;
